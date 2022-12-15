@@ -1,0 +1,176 @@
+#include<stdlib.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define BUFFER 10
+int in = 0, out = 0;          
+  //变量in的含义： in说明当前生产者生产好产品后应该放在缓存区的哪个位置，一般而言，in所在位置没有产品，
+//变量out的含义： out说明当前消费者应该从缓存区的哪个位置取产品，一般而言，out所在位置有产品，
+int t = 0;
+//变量t的含义：t说明现在的缓存区一共有几个待取用的产品
+int buffer[10];
+int get_srand();       
+//返回一个随机数，用于生产者和消费者的睡眠 
+sem_t empty,full;
+//同步信号量empty和full。生产者需要empty信号量资源，并且释放full信号量资源。消费者需要full信号量资源并释放empty信号量资源。 
+pthread_mutex_t mutex;
+//互斥信号量资源mutex。任意的一次访问缓存区都需要此资源，即不论生产还是消费都需要此资源。 
+pthread_t arr[50];
+//arr数组用于存储所有的生产者消费者进程 
+int num_producer, num_customer;
+//变量num_producer的含义：一共有多少个生产者 
+//变量num_customer的含义：一共有多少个消费者 
+int sum = 0;
+//变量sum的含义：当前的生产或消费为第sum个基本操作，注意：每一次生产或消费即一次基本操作 
+void V_out(int out, int t, int number);
+//V_out函数的作用：消费者从out位置消费好产品后，缓存区剩余t个产品。然后使用V_out函数打印当前缓存区的状态。“#”代表此处有产品，数字代表此处没有产品。 
+void P_out(int in,  int t, int number);
+//P_out函数的作用：生产者后生产好产品放到in位置后，缓存区剩余t个产品。然后使用P_out函数打印当前缓存区的状态。“#”代表此处有产品，数字代表此处没有产品。 
+
+int get_srand(int range)
+//get_srand函数返回一个随机数，用于生产者和消费者的睡眠 
+{
+	int ans;
+	srand((unsigned)time(NULL));
+	ans = rand()%range+1;  //1~range
+	return ans;
+}
+void*  producer(void* arg)
+//producer函数用于创建一个生产者进程 
+{
+    while(1)
+    {
+	//will put nextp to buffer
+ 	//int nextp = get_srand(BUFFER);
+            
+        sem_wait(&empty); //P
+        pthread_mutex_lock(&mutex);
+        //add
+	++t;
+//	printf("producer :  %2d 1 to  %2d	", in, ++t);
+	P_out(in, t, 1);
+	in = (in + 1)%BUFFER;
+	//++t;
+	//P_out(t, 1);
+        //t++;
+        pthread_mutex_unlock(&mutex);
+        sem_post(&full);//V
+	int wait_time = get_srand(2);
+        sleep(wait_time);
+    }
+}
+  
+void* customer(void* arg)
+//customer函数用于创建一个消费者进程 
+{
+    while(1)
+    {
+	    //will custom nextc from buffer
+	//int nextc = get_srand(BUFFER);
+
+        sem_wait(&full); //P
+        pthread_mutex_lock(&mutex);
+	--t;	
+//	printf("customer : %2d 1 to  %2d", out, --t);
+	V_out(out, t, 1);
+	out = (out+1)%BUFFER;
+	//--t;
+	//V_out(t, 1);
+        //t--;
+	//printf("customer delete 1 to %d\n", t);
+        pthread_mutex_unlock(&mutex);
+        sem_post(&empty);//V
+	//int wait_time = get_srand(5);
+        //sleep(wait_time);
+    }
+}
+  
+int main()
+{
+    printf("input the number of the producer and customer : ");
+    scanf("%d%d", &num_producer, &num_customer);
+    
+    pthread_mutex_init(&mutex, NULL);
+    sem_init(&full, 0, 0);
+    sem_init(&empty, 0, 10);
+    
+    for(int i = 0; i < num_producer; ++i)
+    {
+	    pthread_create(&arr[i], NULL, producer, NULL);
+    }
+    for(int i = num_producer; i < num_producer+num_customer; ++i)
+    {
+	    pthread_create(&arr[i], NULL, customer, NULL);
+    }
+    for(int i = 0; i < num_producer+num_customer; ++i)
+    {
+	    pthread_join(arr[i], NULL);
+    }
+    return 0;
+}
+
+void P_out(int in, int t, int number)
+{
+	++sum;
+	printf("NUMBER %3d 	", sum);
+	if(in >= t)
+	{
+		for(int i = 0; i < BUFFER; ++i)
+		{
+			if(i > in-t && i <= in)
+			{
+				printf("#");
+			}
+			else 
+				printf("%d", i);
+		}
+	}
+	else 
+	{
+		int other = t-(in+1);
+		for(int i = 0; i < BUFFER; ++i)
+		{
+			if(i <= in || (i >= BUFFER-other && i < BUFFER))
+			{
+				printf("#");
+			}
+			else 
+				printf("%d", i);
+		}
+	}
+	printf("\n");
+}
+void V_out(int out, int t, int number)
+{
+	++sum;
+	printf("NUMBER %3d 	", sum);
+	if(out+t < BUFFER)
+	{
+		for(int i = 0; i < BUFFER; ++i)
+		{
+			if(i > out && i <= out+t)
+			{
+				printf("#");
+			}
+			else 
+				printf("%d", i);
+		}
+	}
+	else
+	{
+		int other = BUFFER - (out+t);
+		for(int i = 0; i < BUFFER; ++i)
+		{
+			if(i <= other || i > out)
+			{
+				printf("#");
+			}
+			else 
+				printf("%d", i);
+		}
+	}
+	printf("\n");
+}
+
+

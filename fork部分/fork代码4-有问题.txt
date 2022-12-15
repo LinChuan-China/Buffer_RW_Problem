@@ -1,0 +1,128 @@
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include<stdlib.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define BUFFER 10
+
+
+int buffer[10];
+int get_srand();
+
+sem_t empty1,full1;
+sem_t empty2,full2;
+sem_t empty3,full3;
+
+pthread_mutex_t mutex;
+
+pthread_t arr[50];
+
+int num_producer=1, num_customer=3;
+
+int sum = 0;
+int in=0;
+int out1=0;
+int out2=0;
+int out3=0;
+int shmid_full1;
+sem_t *shmptr_full1;
+int shmid_buffer[10];
+int *shmptr_buffer[10]; 
+
+
+int get_srand(int range)
+
+{
+        int ans;
+        srand((unsigned)time(NULL));
+        ans = rand()%range+1;  //1~range
+        return ans;
+}
+
+void*  producer()
+
+{
+    int producer_number=1;
+    while(1)
+    {
+
+        *(shmptr_buffer[1])=9999;
+        printf("producer!!\n");
+        sem_post(&(*shmptr_full1));
+    }
+}
+void* customer1()
+
+{
+    while(1)
+    {
+    	sem_wait(&(*shmptr_full1));
+        printf("%d*******************************\n",*(shmptr_buffer[1]));
+        printf("customer1!!\n");    
+
+
+    }
+}
+void* customer2()
+
+{
+    while(1)
+    {
+
+
+        printf("customer2!!\n");    
+
+    }
+}
+void* customer3()
+
+{
+    while(1)
+    {
+
+
+
+        printf("customer3!!\n");    
+  
+    }
+}
+int main()
+{   
+    int p=32;
+    for(int i=0;i<10;i++){
+    	    shmid_buffer[i]=shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT|0666);
+	}
+	for(int i=0;i<10;i++){
+    	    shmptr_buffer[i]=(int *) shmat(shmid_buffer[i], 0, 0);
+	}
+	shmid_full1=shmget(IPC_PRIVATE, sizeof(sem_t), IPC_CREAT|0666);
+	shmptr_full1=(sem_t *) shmat(shmid_full1, 0, 0);
+    pid_t pid1,pid2,pid3;
+    pid1 = fork();   
+    if(pid1==0)  
+    {
+		customer1();
+    }
+    else          
+    {
+		pid2 = fork();
+		if(pid2==0)  
+		{
+			customer2();
+		}
+		else          
+		{
+			pid3 = fork();
+			if(pid3==0){
+				customer3();
+			}
+			else{
+				producer();
+			}
+		}
+     }
+    return 0;
+}
